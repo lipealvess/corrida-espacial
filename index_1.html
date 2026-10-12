@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Corrida Espacial</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh;
+    font-family: Georgia, "Times New Roman", serif;
+    background: radial-gradient(circle at top, #1a2340, #07090f);
+    color: #eee; display: flex; justify-content: center; padding: 16px;
+  }
+  .jogo { max-width: 720px; width: 100%; }
+  h1 { font-size: 1.8rem; margin: 8px 0; color: #f2c14e; text-align: center; }
+  h2 { font-size: 1.3rem; color: #f2c14e; margin-top: 0; }
+  .pista { background: #10162a; border: 2px solid #334; border-radius: 10px; padding: 12px; }
+  .raia { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+  .nome { width: 80px; font-family: monospace; font-weight: bold; }
+  .casas { flex: 1; display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .casa { height: 40px; border-radius: 6px; background: #1f2840; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; }
+  .eua .casa.ativa { background: #1e3a6e; }
+  .urss .casa.ativa { background: #6e1e1e; }
+  .cartao { background: #1f2533; border: 2px solid #445; border-radius: 10px; padding: 20px; margin: 16px 0; line-height: 1.5; }
+  .vez { font-family: monospace; font-size: 1.05rem; margin-bottom: 8px; }
+  button {
+    display: block; width: 100%; text-align: left;
+    background: #2e3850; color: #fff; border: 2px solid #4a5570;
+    border-radius: 8px; padding: 14px; margin: 10px 0;
+    font-size: 1rem; font-family: inherit; cursor: pointer;
+  }
+  button:hover, button:focus { background: #3d4a68; border-color: #f2c14e; outline: none; }
+  .certo { background: #1f3a24; border-left: 4px solid #6c6; padding: 12px; border-radius: 4px; }
+  .errado { background: #3a1f1f; border-left: 4px solid #e66; padding: 12px; border-radius: 4px; }
+  .historia { background: #2a2420; border-left: 4px solid #f2c14e; padding: 12px; margin-top: 12px; border-radius: 4px; }
+  .grande { font-size: 3rem; text-align: center; margin: 0; }
+  footer { text-align: center; color: #888; font-size: .85rem; margin-top: 24px; }
+</style>
+</head>
+<body>
+<main class="jogo">
+  <h1>🚀 Corrida Espacial 🌕</h1>
+
+  <div class="pista" id="pista" hidden>
+    <div class="raia eua"><span class="nome">🇺🇸 EUA</span><div class="casas" id="casas-eua"></div></div>
+    <div class="raia urss"><span class="nome">☭ URSS</span><div class="casas" id="casas-urss"></div></div>
+  </div>
+
+  <div id="tela" class="cartao" aria-live="polite"></div>
+
+  <footer>Trabalho de História — Guerra Fria · <span id="autor"></span></footer>
+</main>
+
+<script>
+// Troque pelo nome do aluno e da turma:
+const AUTOR = "Heitor de Souza Vieira Gonzaga — Turma 9°";
+
+const META = 6; // acertos para chegar à Lua
+
+// A primeira alternativa é sempre a correta (a ordem é embaralhada no jogo).
+const perguntas = [
+  { p: "Qual foi o primeiro satélite artificial a entrar em órbita da Terra, em 1957?", o: ["Sputnik 1", "Explorer 1", "Apollo 11", "Vostok 1"],
+    e: "O Sputnik 1 foi lançado pela URSS em 4 de outubro de 1957 e assustou os americanos, que acharam que estavam ficando para trás." },
+  { p: "Quem foi o primeiro ser vivo a orbitar a Terra?", o: ["A cadela Laika", "O macaco Albert", "Yuri Gagarin", "Neil Armstrong"],
+    e: "A cadela Laika foi ao espaço em 1957, a bordo do Sputnik 2. Infelizmente, ela não sobreviveu à viagem." },
+  { p: "Quem foi o primeiro ser humano a ir ao espaço, em 1961?", o: ["Yuri Gagarin", "Neil Armstrong", "John Glenn", "Alexei Leonov"],
+    e: "O soviético Yuri Gagarin deu uma volta na Terra na nave Vostok 1 em 12 de abril de 1961. Dizem que ele falou: \"A Terra é azul!\"" },
+  { p: "Quem foi a primeira mulher a ir ao espaço?", o: ["Valentina Tereshkova", "Sally Ride", "Marie Curie", "Laika"],
+    e: "A soviética Valentina Tereshkova foi ao espaço em 1963. A primeira americana, Sally Ride, só foi 20 anos depois." },
+  { p: "Quem foi o primeiro homem a pisar na Lua?", o: ["Neil Armstrong", "Buzz Aldrin", "Yuri Gagarin", "John F. Kennedy"],
+    e: "Neil Armstrong pisou na Lua em 20 de julho de 1969, na missão americana Apollo 11. Buzz Aldrin foi o segundo." },
+  { p: "Qual presidente dos EUA prometeu, em 1961, levar um homem à Lua antes do fim da década?", o: ["John F. Kennedy", "Richard Nixon", "Ronald Reagan", "Abraham Lincoln"],
+    e: "Kennedy fez essa promessa em 1961, logo depois do voo de Gagarin. A promessa foi cumprida em 1969." },
+  { p: "Qual agência espacial os EUA criaram em 1958, depois do susto com o Sputnik?", o: ["NASA", "OTAN", "CIA", "ONU"],
+    e: "A NASA foi criada em 1958 para organizar o programa espacial americano." },
+  { p: "Quem fez a primeira caminhada no espaço, fora da nave?", o: ["Alexei Leonov", "Neil Armstrong", "Valentina Tereshkova", "Buzz Aldrin"],
+    e: "O soviético Alexei Leonov saiu da nave e flutuou no espaço por cerca de 12 minutos em 1965." },
+  { p: "Por que esse período foi chamado de \"Guerra Fria\"?", o: ["EUA e URSS nunca lutaram diretamente um contra o outro", "Aconteceu durante um inverno muito forte", "As batalhas foram no Polo Norte", "Usaram apenas armas de gelo"],
+    e: "As duas superpotências disputavam o poder com propaganda, espionagem, corrida armamentista e corrida espacial, mas sem uma guerra direta entre elas." },
+  { p: "Quais eram os dois sistemas em disputa na Guerra Fria?", o: ["Capitalismo (EUA) e socialismo (URSS)", "Monarquia e república", "Feudalismo e capitalismo", "Democracia e monarquia"],
+    e: "Os EUA lideravam o bloco capitalista e a URSS liderava o bloco socialista." },
+  { p: "O que foi o Muro de Berlim?", o: ["Um muro que dividia a cidade de Berlim entre o lado capitalista e o socialista", "Uma muralha da Idade Média", "Uma barreira na fronteira entre EUA e México", "Um muro construído na Segunda Guerra contra os nazistas"],
+    e: "Construído em 1961, ele separava Berlim Oriental (socialista) de Berlim Ocidental (capitalista). Caiu em 1989." },
+  { p: "Em que ano caiu o Muro de Berlim?", o: ["1989", "1961", "1945", "2001"],
+    e: "Em 9 de novembro de 1989 os alemães começaram a derrubar o muro. Foi um dos símbolos do fim da Guerra Fria." },
+  { p: "O que foi o Plano Marshall?", o: ["Ajuda em dinheiro dos EUA para reconstruir a Europa depois da Segunda Guerra", "Um plano soviético para chegar à Lua", "Um ataque nuclear planejado contra Cuba", "Um tratado de paz entre EUA e URSS"],
+    e: "Com o Plano Marshall (1948), os EUA ajudaram a reconstruir a Europa Ocidental e evitaram que esses países se aproximassem do socialismo." },
+  { p: "Qual era a aliança militar liderada pelos EUA, criada em 1949?", o: ["OTAN", "Pacto de Varsóvia", "ONU", "NASA"],
+    e: "A OTAN reunia os EUA e países da Europa Ocidental. Em resposta, a URSS criou o Pacto de Varsóvia em 1955." },
+  { p: "Quem usou a expressão \"Cortina de Ferro\" para falar da divisão da Europa?", o: ["Winston Churchill", "Karl Marx", "Neil Armstrong", "Fidel Castro"],
+    e: "Em 1946, o britânico Winston Churchill disse que uma \"cortina de ferro\" havia descido sobre a Europa, separando o leste do oeste." },
+  { p: "Em que país aconteceu a Crise dos Mísseis de 1962?", o: ["Cuba", "Coreia", "Vietnã", "Alemanha"],
+    e: "A URSS instalou mísseis nucleares em Cuba, perto dos EUA. Foram 13 dias de tensão até um acordo." },
+  { p: "Em que ano a União Soviética deixou de existir?", o: ["1991", "1989", "1969", "1945"],
+    e: "Em dezembro de 1991 a URSS se dividiu em 15 países, e a Guerra Fria terminou." },
+  { p: "O que foi a missão Apollo-Soyuz, em 1975?", o: ["O encontro de naves americana e soviética no espaço", "A primeira viagem à Lua", "Um satélite espião", "A explosão de um foguete"],
+    e: "Astronautas americanos e cosmonautas soviéticos apertaram as mãos no espaço. Foi um sinal de que a corrida espacial estava dando lugar à cooperação." }
+];
+
+const tela = document.getElementById("tela");
+let pos, vez, fila, atual, certa;
+const times = { eua: "🇺🇸 EUA", urss: "☭ URSS" };
+
+document.getElementById("autor").textContent = AUTOR;
+
+function embaralhar(lista) {
+  const a = [...lista];
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+
+function desenharPista() {
+  for (const t of ["eua", "urss"]) {
+    let html = "";
+    for (let i = 0; i <= META; i++) {
+      const ativa = i <= pos[t] ? " ativa" : "";
+      const icone = i === pos[t] ? "🚀" : i === META ? "🌕" : "";
+      html += `<div class="casa${ativa}">${icone}</div>`;
+    }
+    const casas = document.getElementById("casas-" + t);
+    casas.innerHTML = html;
+    casas.setAttribute("aria-label", `${times[t]}: ${pos[t]} de ${META} etapas`);
+  }
+}
+
+function inicio() {
+  document.getElementById("pista").hidden = true;
+  tela.innerHTML = `
+    <h2>A corrida até a Lua</h2>
+    <p>Durante a <b>Guerra Fria</b>, Estados Unidos e União Soviética disputavam quem era mais avançado.
+    Uma das maiores disputas foi a <b>corrida espacial</b>: quem chegaria primeiro ao espaço e à Lua?</p>
+    <p>Dois jogadores (ou dois grupos): um é os <b>EUA 🇺🇸</b> e o outro é a <b>URSS ☭</b>.
+    Vocês se revezam respondendo perguntas. Cada acerto avança o foguete uma etapa.</p>
+    <p>Quem chegar primeiro à Lua 🌕 (<b>${META} acertos</b>) vence!</p>
+    <button onclick="comecar()">▶ Começar</button>`;
+  tela.querySelector("button").focus();
+}
+
+function comecar() {
+  pos = { eua: 0, urss: 0 };
+  vez = "eua";
+  fila = embaralhar(perguntas);
+  document.getElementById("pista").hidden = false;
+  desenharPista();
+  mostrarPergunta();
+}
+
+function mostrarPergunta() {
+  if (fila.length === 0) fila = embaralhar(perguntas); // acabaram as perguntas: recomeça a lista
+  atual = fila.pop();
+  certa = atual.o[0];
+  tela.innerHTML = `
+    <div class="vez">Vez de: <b>${times[vez]}</b></div>
+    <h2>${atual.p}</h2>
+    ${embaralhar(atual.o).map(op => `<button data-op="${op.replace(/"/g, "&quot;")}" onclick="responder(this.dataset.op)">${op}</button>`).join("")}`;
+  tela.querySelector("button").focus();
+}
+
+function responder(op) {
+  const acertou = op === certa;
+  if (acertou) { pos[vez]++; desenharPista(); }
+  tela.innerHTML = `
+    <div class="vez">Vez de: <b>${times[vez]}</b></div>
+    <div class="${acertou ? "certo" : "errado"}">
+      ${acertou ? "✅ <b>Acertou!</b> O foguete avançou uma etapa." : `❌ <b>Errou!</b> A resposta certa era: <b>${certa}</b>`}
+    </div>
+    <div class="historia">📜 ${atual.e}</div>
+    <button onclick="proximo()">Continuar ➜</button>`;
+  tela.querySelector("button").focus();
+}
+
+function proximo() {
+  // Só confere o vencedor quando a URSS joga, para os dois terem o mesmo número de vezes.
+  if (vez === "urss" && (pos.eua >= META || pos.urss >= META)) return fim();
+  vez = vez === "eua" ? "urss" : "eua";
+  mostrarPergunta();
+}
+
+function fim() {
+  const empate = pos.eua >= META && pos.urss >= META;
+  const vencedor = pos.eua >= META ? "eua" : "urss";
+  tela.innerHTML = `
+    <p class="grande">${empate ? "🤝" : "🏆"}</p>
+    <h2>${empate ? "Empate! Os dois chegaram à Lua juntos!" : `${times[vencedor]} chegou primeiro à Lua!`}</h2>
+    <div class="historia">
+      📜 <b>Na história real:</b> a URSS saiu na frente, com o primeiro satélite (1957), o primeiro homem no espaço (1961)
+      e a primeira mulher no espaço (1963). Mas foram os <b>EUA</b> que chegaram primeiro à Lua, com a Apollo 11, em <b>1969</b>.
+      Em 1975, as duas potências se encontraram no espaço na missão Apollo-Soyuz.
+    </div>
+    <button onclick="inicio()">↺ Jogar de novo</button>`;
+  tela.querySelector("button").focus();
+}
+
+inicio();
+</script>
+</body>
+</html>
